@@ -56,12 +56,17 @@ class HttpxCodeExecutionResult(TypedDict):
     output: str
 
 
+class HttpxBlobType(TypedDict):
+    mimeType: str
+    data: str
+
+
 class HttpxPartType(TypedDict, total=False):
     text: str
-    inline_data: BlobType
-    file_data: FileDataType
+    inlineData: HttpxBlobType
+    fileData: FileDataType
     functionCall: HttpxFunctionCall
-    function_response: FunctionResponse
+    functionResponse: FunctionResponse
     executableCode: HttpxExecutableCode
     codeExecutionResult: HttpxCodeExecutionResult
 
@@ -160,6 +165,7 @@ class GenerationConfig(TypedDict, total=False):
     seed: int
     responseLogprobs: bool
     logprobs: int
+    responseModalities: List[Literal["TEXT", "IMAGE", "AUDIO", "VIDEO"]]
 
 
 class Tools(TypedDict, total=False):
@@ -369,9 +375,15 @@ class ResponseTuningJob(TypedDict):
     updateTime: Optional[str]
 
 
+class VideoSegmentConfig(TypedDict, total=False):
+    startOffsetSec: int
+    endOffsetSec: int
+    intervalSec: int
+
+
 class InstanceVideo(TypedDict, total=False):
     gcsUri: str
-    videoSegmentConfig: Tuple[float, float, float]
+    videoSegmentConfig: VideoSegmentConfig
 
 
 class InstanceImage(TypedDict, total=False):
@@ -386,7 +398,7 @@ class Instance(TypedDict, total=False):
     video: InstanceVideo
 
 
-class VertexMultimodalEmbeddingRequest(TypedDict, total=False):
+class VertexMultimodalEmbeddingRequest(TypedDict):
     instances: List[Instance]
 
 
@@ -402,7 +414,7 @@ class MultimodalPrediction(TypedDict, total=False):
     videoEmbeddings: List[VideoEmbedding]
 
 
-class MultimodalPredictions(TypedDict, total=False):
+class MultimodalPredictions(TypedDict):
     predictions: List[MultimodalPrediction]
 
 
