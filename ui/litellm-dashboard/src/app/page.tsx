@@ -20,6 +20,7 @@ import PassThroughSettings from "@/components/pass_through_settings";
 import BudgetPanel from "@/components/budgets/budget_panel";
 import SpendLogsTable from "@/components/view_logs";
 import ModelHub from "@/components/model_hub";
+import NewUsagePage from "@/components/new_usage";
 import APIRef from "@/components/api_ref";
 import ChatUI from "@/components/chat_ui";
 import Sidebar from "@/components/leftnav";
@@ -31,6 +32,9 @@ import GuardrailsPanel from "@/components/guardrails";
 import TransformRequestPanel from "@/components/transform_request";
 import { fetchUserModels } from "@/components/create_key_button";
 import { fetchTeams } from "@/components/common_components/fetch_teams";
+import MCPToolsViewer from "@/components/mcp_tools";
+import TagManagement from "@/components/tag_management";
+
 function getCookie(name: string) {
   const cookieValue = document.cookie
     .split("; ")
@@ -310,6 +314,8 @@ export default function CreateKeyPage() {
                 <BudgetPanel accessToken={accessToken} />
               ) : page == "guardrails" ? (
                 <GuardrailsPanel accessToken={accessToken} />
+              ): page == "transform-request" ? (
+                <TransformRequestPanel accessToken={accessToken} />
               ): page == "general-settings" ? (
                 <GeneralSettings
                   userID={userID}
@@ -346,7 +352,26 @@ export default function CreateKeyPage() {
                   accessToken={accessToken}
                   allTeams={teams as Team[] ?? []}
                 />
-              ) : (
+              ) : page == "mcp-tools" ? (
+                <MCPToolsViewer
+                  accessToken={accessToken}
+                  userRole={userRole}
+                  userID={userID}
+                />
+              ) : page == "tag-management" ? (
+                <TagManagement
+                  accessToken={accessToken}
+                  userRole={userRole}
+                  userID={userID}
+                />
+              ) : page == "new_usage" ? (
+                <NewUsagePage
+                  userID={userID}
+                  userRole={userRole}
+                  accessToken={accessToken}
+                />
+              ) : 
+              (
                 <Usage
                   userID={userID}
                   userRole={userRole}

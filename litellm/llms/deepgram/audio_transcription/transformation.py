@@ -126,9 +126,9 @@ class DeepgramAudioTranscriptionConfig(BaseAudioTranscriptionConfig):
 
             # Add additional metadata matching OpenAI format
             response["task"] = "transcribe"
-            response["language"] = (
-                "english"  # Deepgram auto-detects but doesn't return language
-            )
+            response[
+                "language"
+            ] = "english"  # Deepgram auto-detects but doesn't return language
             response["duration"] = response_json["metadata"]["duration"]
 
             # Transform words to match OpenAI format
@@ -151,6 +151,7 @@ class DeepgramAudioTranscriptionConfig(BaseAudioTranscriptionConfig):
     def get_complete_url(
         self,
         api_base: Optional[str],
+        api_key: Optional[str],
         model: str,
         optional_params: dict,
         litellm_params: dict,
@@ -170,6 +171,7 @@ class DeepgramAudioTranscriptionConfig(BaseAudioTranscriptionConfig):
         model: str,
         messages: List[AllMessageValues],
         optional_params: dict,
+        litellm_params: dict,
         api_key: Optional[str] = None,
         api_base: Optional[str] = None,
     ) -> dict:

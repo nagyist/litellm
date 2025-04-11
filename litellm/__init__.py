@@ -56,12 +56,16 @@ from litellm.constants import (
     bedrock_embedding_models,
     known_tokenizer_config,
     BEDROCK_INVOKE_PROVIDERS_LITERAL,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_SOFT_BUDGET,
+    DEFAULT_ALLOWED_FAILS,
 )
 from litellm.types.guardrails import GuardrailItem
 from litellm.proxy._types import (
     KeyManagementSystem,
     KeyManagementSettings,
     LiteLLM_UpperboundKeyGenerateParams,
+    NewTeamRequest,
 )
 from litellm.types.utils import StandardKeyGenerationConfig, LlmProviders
 from litellm.integrations.custom_logger import CustomLogger
@@ -120,6 +124,7 @@ callbacks: List[
 langfuse_default_tags: Optional[List[str]] = None
 langsmith_batch_size: Optional[int] = None
 prometheus_initialize_budget_metrics: Optional[bool] = False
+require_auth_for_metrics_endpoint: Optional[bool] = False
 argilla_batch_size: Optional[int] = None
 datadog_use_v1: Optional[bool] = False  # if you want to use v1 datadog logged payload
 gcs_pub_sub_use_v1: Optional[bool] = (
@@ -155,7 +160,7 @@ token: Optional[str] = (
     None  # Not used anymore, will be removed in next MAJOR release - https://github.com/BerriAI/litellm/discussions/648
 )
 telemetry = True
-max_tokens = 256  # OpenAI Defaults
+max_tokens: int = DEFAULT_MAX_TOKENS  # OpenAI Defaults
 drop_params = bool(os.getenv("LITELLM_DROP_PARAMS", False))
 modify_params = False
 retry = True
@@ -248,7 +253,7 @@ budget_duration: Optional[str] = (
     None  # proxy only - resets budget after fixed duration. You can set duration as seconds ("30s"), minutes ("30m"), hours ("30h"), days ("30d").
 )
 default_soft_budget: float = (
-    50.0  # by default all litellm proxy keys have a soft budget of 50.0
+    DEFAULT_SOFT_BUDGET  # by default all litellm proxy keys have a soft budget of 50.0
 )
 forward_traceparent_to_llm_provider: bool = False
 
@@ -272,6 +277,7 @@ default_key_generate_params: Optional[Dict] = None
 upperbound_key_generate_params: Optional[LiteLLM_UpperboundKeyGenerateParams] = None
 key_generation_settings: Optional[StandardKeyGenerationConfig] = None
 default_internal_user_params: Optional[Dict] = None
+default_team_params: Optional[Union[NewTeamRequest, Dict]] = None
 default_team_settings: Optional[List] = None
 max_user_budget: Optional[float] = None
 default_max_internal_user_budget: Optional[float] = None
@@ -806,13 +812,13 @@ from .llms.aiohttp_openai.chat.transformation import AiohttpOpenAIChatConfig
 from .llms.galadriel.chat.transformation import GaladrielChatConfig
 from .llms.github.chat.transformation import GithubChatConfig
 from .llms.empower.chat.transformation import EmpowerChatConfig
-from .llms.huggingface.chat.transformation import (
-    HuggingfaceChatConfig as HuggingfaceConfig,
-)
+from .llms.huggingface.chat.transformation import HuggingFaceChatConfig
+from .llms.huggingface.embedding.transformation import HuggingFaceEmbeddingConfig
 from .llms.oobabooga.chat.transformation import OobaboogaConfig
 from .llms.maritalk import MaritalkConfig
 from .llms.openrouter.chat.transformation import OpenrouterConfig
 from .llms.anthropic.chat.transformation import AnthropicConfig
+from .llms.anthropic.common_utils import AnthropicModelInfo
 from .llms.groq.stt.transformation import GroqSTTConfig
 from .llms.anthropic.completion.transformation import AnthropicTextConfig
 from .llms.triton.completion.transformation import TritonConfig
@@ -848,6 +854,7 @@ from .llms.vertex_ai.gemini.vertex_and_google_ai_studio_gemini import (
     VertexGeminiConfig,
     VertexGeminiConfig as VertexAIConfig,
 )
+from .llms.gemini.common_utils import GeminiModelInfo
 from .llms.gemini.chat.transformation import (
     GoogleAIStudioGeminiConfig,
     GoogleAIStudioGeminiConfig as GeminiConfig,  # aliased to maintain backwards compatibility
@@ -984,6 +991,7 @@ from .llms.fireworks_ai.embed.fireworks_ai_transformation import (
 from .llms.friendliai.chat.transformation import FriendliaiChatConfig
 from .llms.jina_ai.embedding.transformation import JinaAIEmbeddingConfig
 from .llms.xai.chat.transformation import XAIChatConfig
+from .llms.xai.common_utils import XAIModelInfo
 from .llms.volcengine import VolcEngineConfig
 from .llms.codestral.completion.transformation import CodestralTextCompletionConfig
 from .llms.azure.azure import (
@@ -1045,6 +1053,7 @@ from .cost_calculator import response_cost_calculator, cost_per_token
 
 ### ADAPTERS ###
 from .types.adapter import AdapterItem
+import litellm.anthropic_interface as anthropic
 
 adapters: List[AdapterItem] = []
 
