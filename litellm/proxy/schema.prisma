@@ -264,6 +264,7 @@ model LiteLLM_SpendLogs {
   proxy_server_request Json?     @default("{}")
   @@index([startTime])
   @@index([end_user])
+  @@index([session_id])
 }
 
 // View spend, model, api_key per request
@@ -469,4 +470,14 @@ model LiteLLM_ManagedVectorStoresTable {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   litellm_credential_name String?
+}
+
+// Guardrails table for storing guardrail configurations
+model LiteLLM_GuardrailsTable {
+  guardrail_id String @id @default(uuid())
+  guardrail_name String @unique
+  litellm_params Json
+  guardrail_info Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
