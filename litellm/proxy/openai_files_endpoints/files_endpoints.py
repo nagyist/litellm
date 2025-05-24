@@ -179,6 +179,7 @@ async def route_create_file(
             create_file_request=_create_file_request,
             target_model_names_list=target_model_names_list,
             litellm_parent_otel_span=user_api_key_dict.parent_otel_span,
+            user_api_key_dict=user_api_key_dict,
         )
     else:
         # get configs for custom_llm_provider
@@ -413,7 +414,6 @@ async def get_file_content(
     ```
     """
     from litellm.proxy.proxy_server import (
-        add_litellm_data_to_request,
         general_settings,
         llm_router,
         proxy_config,
@@ -421,16 +421,21 @@ async def get_file_content(
         version,
     )
 
-    data: Dict = {}
+    data: Dict = {"file_id": file_id}
     try:
         # Include original request and headers in the data
-        data = await add_litellm_data_to_request(
-            data=data,
+        base_llm_response_processor = ProxyBaseLLMRequestProcessing(data=data)
+        (
+            data,
+            litellm_logging_obj,
+        ) = await base_llm_response_processor.common_processing_pre_call_logic(
             request=request,
             general_settings=general_settings,
             user_api_key_dict=user_api_key_dict,
             version=version,
+            proxy_logging_obj=proxy_logging_obj,
             proxy_config=proxy_config,
+            route_type="afile_content",
         )
 
         custom_llm_provider = (
@@ -464,15 +469,32 @@ async def get_file_content(
                     param="None",
                     code=500,
                 )
-            response = await managed_files_obj.afile_content(
-                file_id=file_id,
-                litellm_parent_otel_span=user_api_key_dict.parent_otel_span,
-                llm_router=llm_router,
-                **data,
-            )
+            model = cast(Optional[str], data.get("model"))
+            if model:
+                response = await llm_router.afile_content(
+                    **{
+                        "model": model,
+                        "file_id": file_id,
+                        **data,
+                    }
+                )  # type: ignore
+
+            else:
+                response = await managed_files_obj.afile_content(
+                    **{
+                        "file_id": file_id,
+                        "litellm_parent_otel_span": user_api_key_dict.parent_otel_span,
+                        "llm_router": llm_router,
+                        **data,
+                    }
+                )
         else:
             response = await litellm.afile_content(
-                custom_llm_provider=custom_llm_provider, file_id=file_id, **data  # type: ignore
+                **{
+                    "custom_llm_provider": custom_llm_provider,
+                    "file_id": file_id,
+                    **data,
+                }  # type: ignore
             )
 
         ### ALERTING ###
@@ -514,7 +536,7 @@ async def get_file_content(
         await proxy_logging_obj.post_call_failure_hook(
             user_api_key_dict=user_api_key_dict, original_exception=e, request_data=data
         )
-        verbose_proxy_logger.error(
+        verbose_proxy_logger.exception(
             "litellm.proxy.proxy_server.retrieve_file_content(): Exception occured - {}".format(
                 str(e)
             )
@@ -848,6 +870,7 @@ async def list_files(
     fastapi_response: Response,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
     provider: Optional[str] = None,
+    target_model_names: Optional[str] = None,
     purpose: Optional[str] = None,
 ):
     """
@@ -864,8 +887,8 @@ async def list_files(
     ```
     """
     from litellm.proxy.proxy_server import (
-        add_litellm_data_to_request,
         general_settings,
+        llm_router,
         proxy_config,
         proxy_logging_obj,
         version,
@@ -873,24 +896,62 @@ async def list_files(
 
     data: Dict = {}
     try:
-        custom_llm_provider = (
-            provider
-            or await get_custom_llm_provider_from_request_body(request=request)
-            or "openai"
-        )
         # Include original request and headers in the data
-        data = await add_litellm_data_to_request(
-            data=data,
+        base_llm_response_processor = ProxyBaseLLMRequestProcessing(data=data)
+        (
+            data,
+            litellm_logging_obj,
+        ) = await base_llm_response_processor.common_processing_pre_call_logic(
             request=request,
             general_settings=general_settings,
             user_api_key_dict=user_api_key_dict,
             version=version,
+            proxy_logging_obj=proxy_logging_obj,
             proxy_config=proxy_config,
+            route_type=CallTypes.alist_fine_tuning_jobs.value,
         )
 
-        response = await litellm.afile_list(
-            custom_llm_provider=custom_llm_provider, purpose=purpose, **data  # type: ignore
+        response: Optional[Any] = None
+        if target_model_names and isinstance(target_model_names, str):
+            target_model_names_list = target_model_names.split(",")
+            if len(target_model_names_list) != 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="target_model_names on list files must be a list of one model name. Example: ['gpt-4o']",
+                )
+            ## Use router to list fine-tuning jobs for that model
+            if llm_router is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="LLM Router not initialized. Ensure models added to proxy.",
+                )
+            data["model"] = target_model_names_list[0]
+            response = await llm_router.afile_list(
+                **data,
+            )
+        else:
+            custom_llm_provider = (
+                provider
+                or await get_custom_llm_provider_from_request_body(request=request)
+                or "openai"
+            )
+
+            response = await litellm.afile_list(
+                custom_llm_provider=custom_llm_provider, purpose=purpose, **data  # type: ignore
+            )
+
+        if response is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Either 'provider' or 'target_model_names' must be provided e.g. `?target_model_names=gpt-4o`",
+            )
+
+        ## POST CALL HOOKS ###
+        _response = await proxy_logging_obj.post_call_success_hook(
+            data=data, user_api_key_dict=user_api_key_dict, response=response
         )
+        if _response is not None and isinstance(_response, OpenAIFileObject):
+            response = _response
 
         ### ALERTING ###
         asyncio.create_task(
